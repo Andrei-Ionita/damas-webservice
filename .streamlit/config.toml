@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "teal"
+backgroundColor = "white"
+secondaryBackgroundColor = "lightgrey"
+textColor = "black"
+font = "sans serif"
