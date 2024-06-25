@@ -83,7 +83,7 @@ def refresh_data():
         dispatch_orders_placeholder.success("Ordinele de Dispecer au fost obținute cu succes!")
         dispatch_orders_placeholder.code(dispatch_orders, language="xml")
     else:
-        dispatch_orders_placeholder.error("Nu s-a primit un răspuns de la server.")
+        dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
 # Button to trigger the SOAP request manually
 if st.sidebar.button("Obține Ordine de Dispecer"):
