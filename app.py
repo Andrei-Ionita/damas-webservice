@@ -3,6 +3,7 @@ import requests
 from lxml import etree
 from datetime import datetime, timedelta
 import time
+import xml.etree.ElementTree as ET
 
 # Set the page title
 st.set_page_config(page_title="Client Web Service Damas", layout="wide")
@@ -16,6 +17,19 @@ def get_current_timestamp():
     now = datetime.utcnow()
     expires = now + timedelta(hours=1)
     return now.strftime("%Y-%m-%dT%H:%M:%SZ"), expires.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def convert_utc_to_eet(utc_time_str):
+    # Remove the 'Z' if present
+    if utc_time_str.endswith('Z'):
+        utc_time_str = utc_time_str[:-1]
+    # Try parsing with both possible formats
+    try:
+        utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M")
+    # Convert to EET (UTC+2) and account for daylight saving (UTC+3 during summer)
+    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
+    return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
 # Function to send SOAP request for dispatch orders
 def get_dispatch_orders(date_from, date_to):
@@ -55,7 +69,7 @@ def get_dispatch_orders(date_from, date_to):
     }
 
     # Send the SOAP request
-    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws", data=soap_request, headers=headers)
+    response = requests.post("https://test.newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00127002300000000000000000000100/ws", data=soap_request, headers=headers)
 
     if response.status_code == 200:
         return response.content
@@ -74,14 +88,27 @@ date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.utcnow())
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
 
+
 def refresh_data():
+    orders = []
     response = get_dispatch_orders(date_from, date_to)
     if response:
         # Parse the XML response
-        tree = etree.fromstring(response)
-        dispatch_orders = etree.tostring(tree, pretty_print=True).decode("utf-8")
-        dispatch_orders_placeholder.success("Ordinele de Dispecer au fost obținute cu succes!")
-        dispatch_orders_placeholder.code(dispatch_orders, language="xml")
+        root = ET.fromstring(response)
+        for bid_time_series in root.findall(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}Bid_TimeSeries"):
+            direction_code = bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}flowDirection.direction").text
+            direction = "Crestere" if direction_code == "A01" else "Scadere" if direction_code == "A02" else direction_code
+            orders.append({
+                "Ora de Start": convert_utc_to_eet(bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}start").text),
+                "Ora de Sfarsit": convert_utc_to_eet(bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}end").text),
+                "Directia": direction,
+                "Cantitatea": bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}quantity.quantity").text,
+            })
+        if orders:
+            # Sort orders by 'Ora de Start'
+            orders = sorted(orders, key=lambda x: x['Ora de Start'])
+            st.header("Ordine de Dispecer:", divider="gray")
+            st.table(orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
