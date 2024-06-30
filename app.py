@@ -107,7 +107,7 @@ def get_dispatch_orders(date_from, date_to):
     }
 
     # Send the SOAP request
-    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00127002300000000000000000000100/ws", data=soap_request, headers=headers)
+    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws", data=soap_request, headers=headers)
 
     if response.status_code == 200:
         return response.content
