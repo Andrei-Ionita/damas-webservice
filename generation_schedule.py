@@ -4,7 +4,6 @@ from lxml import etree
 from datetime import datetime, timedelta
 import time
 import xml.etree.ElementTree as ET
-import numpy as np
 
 # Set the page title
 st.set_page_config(page_title="Client Web Service Damas", layout="wide")
@@ -27,16 +26,14 @@ def convert_utc_to_eet(utc_time_str):
     try:
         utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
-        try:
-            utc_time = datetime.strptime(utc_time_str, "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M")
+        utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M")
     # Convert to EET (UTC+2) and account for daylight saving (UTC+3 during summer)
-    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
+    eet_time = utc_time + timedelta(hours=3)  # Assuming daylight saving time
     return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
 # Function to simulate generation schedule response
-def get_generation_schedule():
+def get_generation_schedule(date_from, date_to):
+    points = "".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)])
     return """
     <env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">
         <env:Header/>
@@ -50,7 +47,7 @@ def get_generation_schedule():
                                 <Period>
                                     <timeInterval>
                                         <start>2024-06-26T00:00Z</start>
-                                        <end>2024-06-26T23:45Z</end>
+                                        <end>2024-06-27T00:00Z</end>
                                     </timeInterval>
                                     <Resolution>PT15M</Resolution>
                                     {points}
@@ -66,7 +63,8 @@ def get_generation_schedule():
             </ns2:RunSynchronousResponse>
         </env:Body>
     </env:Envelope>
-    """.format(points="".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)]))
+    """.format(points=points)
+
 
 
 # Function to send SOAP request for dispatch orders
@@ -84,7 +82,7 @@ def get_dispatch_orders(date_from, date_to):
                 </wsse:UsernameToken>
                 <wsu:Timestamp wsu:Id="timestamp_id">
                     <wsu:Created>{created}</wsu:Created>
-                    <wsu:Expires>{expires}</wsu:Expires>
+                    <wsu:Expires>{expires}</wsu:Expires}
                 </wsu:Timestamp>
             </wsse:Security>
         </soap:Header>
@@ -107,54 +105,12 @@ def get_dispatch_orders(date_from, date_to):
     }
 
     # Send the SOAP request
-    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00127002300000000000000000000100/ws", data=soap_request, headers=headers)
+    response = requests.post("https://test.newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00127002300000000000000000000100/ws", data=soap_request, headers=headers)
 
     if response.status_code == 200:
         return response.content
     else:
         return None
-
-def process_orders_and_calculate_schedule(generation_schedule, orders):
-    live_schedule = []
-    current_power = float(generation_schedule[0]["Punct de bază [MW]"])
-    current_start = generation_schedule[0]["Ora de Inceput"]
-
-    for interval in generation_schedule:
-        start_time = interval["Ora de Inceput"]
-        end_time = interval["Ora de Sfarsit"]
-        power = float(interval["Punct de bază [MW]"])
-
-        # Apply orders
-        for order in orders:
-            order_start = order["Ora de Start"]
-            order_end = order["Ora de Sfarsit"]
-            order_power = float(order["Cantitatea"])
-            if order_start <= start_time < order_end:
-                if order["Directia"] == "Crestere":
-                    power += order_power
-                elif order["Directia"] == "Scadere":
-                    power -= order_power
-
-        # If power changes, update live schedule
-        if power != current_power:
-            live_schedule.append({
-                "Ora de Inceput": current_start,
-                "Ora de Sfarsit": start_time,
-                "Punct de bază [MW]": max(0, current_power),
-                "Bandă reglare [MW]": 0
-            })
-            current_start = start_time
-            current_power = power
-
-    # Append the last interval
-    live_schedule.append({
-        "Ora de Inceput": current_start,
-        "Ora de Sfarsit": generation_schedule[-1]["Ora de Sfarsit"],
-        "Punct de bază [MW]": max(0, current_power),
-        "Bandă reglare [MW]": 0
-    })
-
-    return live_schedule
 
 # Main section
 st.title("Client Web Service Damas")
@@ -162,19 +118,22 @@ st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a ob�
 
 # Sidebar inputs for date range
 st.sidebar.header("Selectați Intervalul de Date")
-date_from = st.sidebar.date_input("Data de început", value=datetime.utcnow())
-date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.utcnow() + timedelta(days=1))
+date_from = st.sidebar.date_input("Data de început", value=datetime.utcnow() - timedelta(days=1))
+date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.utcnow())
 
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
-
 
 def refresh_data():
     orders = []
     response = get_dispatch_orders(date_from, date_to)
     # Fetch generation schedule
-    response_schedule = get_generation_schedule()
+    response_schedule = get_generation_schedule(date_from, date_to)
     generation_schedule = []
+
+    # Calculate the dynamic start time
+    dynamic_start_time = (datetime.combine(date_from, datetime.min.time()) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     if response:
         # Parse the XML response
         root = ET.fromstring(response)
@@ -189,13 +148,13 @@ def refresh_data():
                 "Ora de Start": convert_utc_to_eet(start_time),
                 "Ora de Sfarsit": convert_utc_to_eet(end_time),
                 "Directia": direction,
-                "Cantitatea": bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}quantity.quantity").text,
+                "Cantitatea": float(bid_time_series.find(".//{urn:iec62325.351:tc57wg16:451-7:reservebiddocument:7:2}quantity.quantity").text),
             })
         if orders:
             # Sort orders by 'Ora de Start'
             orders = sorted(orders, key=lambda x: x['Ora de Start'])
-            # st.header("Ordine de Dispecer:", divider="gray")
-            # st.table(orders)
+            st.header("Ordine de Dispecer:")
+            st.table(orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
@@ -203,33 +162,51 @@ def refresh_data():
         root_schedule = ET.fromstring(response_schedule)
         for point in root_schedule.findall(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}Point"):
             position = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}position").text
-            quantity = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}quantity").text
-            start_time_input = date_from  # Use the user input date directly as a date object
-            initial_start_time = datetime.combine(start_time_input, datetime.min.time()) - timedelta(hours=3)  # Subtract 3 hours to get the initial start time
-
-            # Format 'initial_start_time' as a string in the required format
-            initial_start_time_str = initial_start_time.strftime("%Y-%m-%dT%H:%MZ")
-
-            # Use the formatted string to calculate the 'start_time'
-            start_time = datetime.strptime(initial_start_time_str, "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
-            # start_time = datetime.strptime(date_from.strftime("%Y-%m-%dT%H:%MZ") - timedelta(hours=3), "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
+            quantity = float(point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}quantity").text)
+            start_time = datetime.strptime(dynamic_start_time, "%Y-%m-%dT%H:%M:%SZ") + timedelta(minutes=15 * (int(position) - 1))
             end_time = start_time + timedelta(minutes=15)
             generation_schedule.append({
-                "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%S")),
-                "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%S")),
+                "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+                "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
                 "Punct de bază [MW]": quantity,
                 "Bandă reglare [MW]": 0  # Assuming this remains 0 as per the example
             })
         if generation_schedule:
             generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
-            # st.write("Program de Generare:")
-            # st.table(generation_schedule)
+            st.write("Program de Generare:")
+            st.table(generation_schedule)
 
-            # Process orders and calculate live schedule
-            live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
-            st.write("Program de Generare Live:")
-            st.table(live_schedule)
+def process_orders_and_calculate_schedule(generation_schedule, orders):
+    live_schedule = []
+    for interval in generation_schedule:
+        start_time = interval["Ora de Inceput"]
+        end_time = interval["Ora de Sfarsit"]
+        current_power = float(interval["Punct de bază [MW]"])
+        for order in orders:
+            order_start = order["Ora de Start"]
+            order_end = order["Ora de Sfarsit"]
+            order_power = order["Cantitatea"]
+            if order_start <= start_time < order_end:
+                if order["Directia"] == "Crestere":
+                    current_power += order_power
+                elif order["Directia"] == "Scadere":
+                    current_power -= order_power
+        live_schedule.append({
+            "Ora de Inceput": start_time,
+            "Ora de Sfarsit": end_time,
+            "Punct de bază [MW]": max(0, current_power),
+            "Bandă reglare [MW]": 0  # Assuming this remains 0 as per the example
+        })
+    return live_schedule
 
+def display_live_schedule():
+    st.write("Program de Generare Live:")
+    live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
+    simplified_schedule = []
+    for i, row in enumerate(live_schedule):
+        if i == 0 or row["Punct de bază [MW]"] != live_schedule[i-1]["Punct de bază [MW]"]:
+            simplified_schedule.append(row)
+    st.table(simplified_schedule)
 
 # Button to trigger the SOAP request manually
 if st.sidebar.button("Obține Ordine de Dispecer"):
@@ -238,5 +215,6 @@ if st.sidebar.button("Obține Ordine de Dispecer"):
 # Auto-refresh every 30 seconds
 while True:
     refresh_data()
+    display_live_schedule()
     time.sleep(30)
     st.experimental_rerun()
