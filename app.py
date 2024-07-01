@@ -162,8 +162,8 @@ st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a ob�
 
 # Sidebar inputs for date range
 st.sidebar.header("Selectați Intervalul de Date")
-date_from = st.sidebar.date_input("Data de început", value=datetime.utcnow())
-date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.utcnow() + timedelta(days=1))
+date_from = st.sidebar.date_input("Data de început", value=datetime.now())
+date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.now() + timedelta(days=1))
 
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
