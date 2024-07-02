@@ -35,6 +35,17 @@ def convert_utc_to_eet(utc_time_str):
     eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
     return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
+# Sidebar inputs for date range
+def set_dates(auto_update):
+    if auto_update:
+        date_from = datetime.now().date()
+        date_to = (datetime.now() + timedelta(days=1)).date()
+    else:
+        st.sidebar.header("Selectați Intervalul de Date")
+        date_from = st.sidebar.date_input("Data de început", value=datetime.now().date())
+        date_to = st.sidebar.date_input("Data de sfârșit", value=(datetime.now() + timedelta(days=1)).date())
+    return date_from, date_to
+
 # Function to simulate generation schedule response
 def get_generation_schedule():
     return """
@@ -68,6 +79,21 @@ def get_generation_schedule():
     </env:Envelope>
     """.format(points="".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)]))
 
+# Function to manually create tomorrow's generation schedule with 0 MW from 8:00 to 00:00
+def create_tomorrows_generation_schedule():
+    intervals = []
+    base_time = datetime.strptime("2024-07-02T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    for i in range(96):
+        start_time = base_time + timedelta(minutes=15 * i)
+        end_time = start_time + timedelta(minutes=15)
+        power = 0.0 if start_time >= datetime.strptime("2024-07-03T04:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 4.3
+        intervals.append({
+            "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "Punct de bază [MW]": power,
+            "Bandă reglare [MW]": 0
+        })
+    return intervals
 
 # Function to send SOAP request for dispatch orders
 def get_dispatch_orders(date_from, date_to):
@@ -174,7 +200,12 @@ def refresh_data():
     response = get_dispatch_orders(date_from, date_to)
     # Fetch generation schedule
     response_schedule = get_generation_schedule()
-    generation_schedule = []
+    # Manually create tomorrow's generation schedule if today is 03.07.2024
+    current_date = datetime.now().date()
+    if current_date == datetime(2024, 7, 3).date():
+        generation_schedule = create_tomorrows_generation_schedule()
+    else:
+        generation_schedule = []  # Replace with your usual generation schedule fetching logic
     if response:
         # Parse the XML response
         root = ET.fromstring(response)
@@ -199,7 +230,17 @@ def refresh_data():
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
-    if response_schedule:
+    if len(generation_schedule) > 0:
+        generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
+        # st.write("Program de Generare:")
+        # st.table(generation_schedule)
+
+        # Process orders and calculate live schedule
+        live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
+        st.write("Program de Generare Live:")
+        st.table(live_schedule)
+
+    elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
         for point in root_schedule.findall(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}Point"):
             position = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}position").text
@@ -230,6 +271,8 @@ def refresh_data():
             st.write("Program de Generare Live:")
             st.table(live_schedule)
 
+# Add a checkbox for auto-update
+auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 
 # Button to trigger the SOAP request manually
 if st.sidebar.button("Obține Ordine de Dispecer"):
@@ -237,6 +280,7 @@ if st.sidebar.button("Obține Ordine de Dispecer"):
 
 # Auto-refresh every 30 seconds
 while True:
+    set_dates(auto_update)
     refresh_data()
     time.sleep(30)
     st.experimental_rerun()
