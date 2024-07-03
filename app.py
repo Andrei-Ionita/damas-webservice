@@ -190,7 +190,8 @@ st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a ob�
 auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 # Sidebar inputs for date range
 st.sidebar.header("Selectați Intervalul de Date")
-date_from, date_to = set_dates(auto_update)
+date_from = st.sidebar.date_input("Data de început", value=set_dates(auto_update)[0])
+date_to = st.sidebar.date_input("Data de sfârșit", value=set_dates(auto_update)[1])
 
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
