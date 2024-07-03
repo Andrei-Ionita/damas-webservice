@@ -79,7 +79,7 @@ def get_generation_schedule():
     </env:Envelope>
     """.format(points="".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)]))
 
-# Function to manually create tomorrow's generation schedule with 0 MW from 8:00 to 00:00
+# Function to manually create tomorrow's generation schedule with 0 MW from 00:00 to 19:00 EET
 def create_tomorrows_generation_schedule():
     intervals = []
     base_time = datetime.strptime("2024-07-02T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
@@ -87,6 +87,21 @@ def create_tomorrows_generation_schedule():
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
         power = 0.0 if start_time >= datetime.strptime("2024-07-03T04:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 4.3
+        intervals.append({
+            "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "Punct de bază [MW]": power,
+            "Bandă reglare [MW]": 0
+        })
+    return intervals
+
+def create_2days_ahead_generation_schedule():
+    intervals = []
+    base_time = datetime.strptime("2024-07-03T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    for i in range(96):
+        start_time = base_time + timedelta(minutes=15 * i)
+        end_time = start_time + timedelta(minutes=15)
+        power = 4.3 if start_time >= datetime.strptime("2024-07-04T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 0.0
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -207,6 +222,8 @@ def refresh_data():
     current_date = datetime.now().date()
     if current_date == datetime(2024, 7, 3).date():
         generation_schedule = create_tomorrows_generation_schedule()
+    elif current_date == datetime(2024, 7, 4).date():
+        generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
     if response:
