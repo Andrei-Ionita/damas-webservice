@@ -98,7 +98,7 @@ def create_tomorrows_generation_schedule():
 # Function to send SOAP request for dispatch orders
 def get_dispatch_orders(date_from, date_to):
     created, expires = get_current_timestamp()
-    
+    date_to = date_to - timedelta(days=1)
     # SOAP request XML
     soap_request = f"""
     <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wse="http://markets.transelectrica.ro/wse">
@@ -186,10 +186,11 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
 st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
 
+# Add a checkbox for auto-update
+auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 # Sidebar inputs for date range
 st.sidebar.header("Selectați Intervalul de Date")
-date_from = st.sidebar.date_input("Data de început", value=datetime.now())
-date_to = st.sidebar.date_input("Data de sfârșit", value=datetime.now() + timedelta(days=1))
+date_from, date_to = set_dates(auto_update)
 
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
@@ -198,6 +199,7 @@ dispatch_orders_placeholder = st.empty()
 def refresh_data():
     orders = []
     response = get_dispatch_orders(date_from, date_to)
+    
     # Fetch generation schedule
     response_schedule = get_generation_schedule()
     # Manually create tomorrow's generation schedule if today is 03.07.2024
@@ -270,9 +272,6 @@ def refresh_data():
             live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
             st.write("Program de Generare Live:")
             st.table(live_schedule)
-
-# Add a checkbox for auto-update
-auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 
 # Button to trigger the SOAP request manually
 if st.sidebar.button("Obține Ordine de Dispecer"):
