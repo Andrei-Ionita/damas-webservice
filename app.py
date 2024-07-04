@@ -41,9 +41,8 @@ def set_dates(auto_update):
         date_from = datetime.now().date()
         date_to = (datetime.now() + timedelta(days=1)).date()
     else:
-        st.sidebar.header("Selectați Intervalul de Date")
-        date_from = st.sidebar.date_input("Data de început", value=datetime.now().date())
-        date_to = st.sidebar.date_input("Data de sfârșit", value=(datetime.now() + timedelta(days=1)).date())
+        date_from = st.sidebar.date_input("Data de început", value=datetime.now().date(), key="date_from")
+        date_to = st.sidebar.date_input("Data de sfârșit", value=(datetime.now() + timedelta(days=1)).date(), key="date_to")
     return date_from, date_to
 
 # Function to simulate generation schedule response
@@ -86,7 +85,7 @@ def create_tomorrows_generation_schedule():
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
-        power = 0.0 if start_time >= datetime.strptime("2024-07-03T04:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 4.3
+        power = 0.0 if start_time >= datetime.strptime("2024-07-03T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 4.3
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -159,6 +158,7 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
     live_schedule = []
     current_power = float(generation_schedule[0]["Punct de bază [MW]"])
     current_start = generation_schedule[0]["Ora de Inceput"]
+    schedule_changed = False
 
     for interval in generation_schedule:
         start_time = interval["Ora de Inceput"]
@@ -186,6 +186,7 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
             })
             current_start = start_time
             current_power = power
+            schedule_changed = True
 
     # Append the last interval
     live_schedule.append({
@@ -195,7 +196,7 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
         "Bandă reglare [MW]": 0
     })
 
-    return live_schedule
+    return live_schedule, schedule_changed
 
 # Main section
 st.title("Client Web Service Damas")
@@ -203,14 +204,24 @@ st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a ob�
 
 # Add a checkbox for auto-update
 auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
+
 # Sidebar inputs for date range
 st.sidebar.header("Selectați Intervalul de Date")
-date_from = st.sidebar.date_input("Data de început", value=set_dates(auto_update)[0])
-date_to = st.sidebar.date_input("Data de sfârșit", value=set_dates(auto_update)[1])
+date_from = st.sidebar.date_input("Data de început", value=set_dates(auto_update)[0], key="date_from_input")
+date_to = st.sidebar.date_input("Data de sfârșit", value=set_dates(auto_update)[1], key="date_to_input")
 
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
 
+# JavaScript for playing sound
+st.markdown("""
+    <script>
+    function playSound() {
+        var audio = new Audio('https://www.soundjay.com/button/beep-07.wav');
+        audio.play();
+    }
+    </script>
+""", unsafe_allow_html=True)
 
 def refresh_data():
     orders = []
@@ -256,9 +267,13 @@ def refresh_data():
         # st.table(generation_schedule)
 
         # Process orders and calculate live schedule
-        live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
+        live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
         st.write("Program de Generare Live:")
         st.table(live_schedule)
+        
+        # Play sound if schedule changed
+        if schedule_changed:
+            st.markdown("<script>playSound()</script>", unsafe_allow_html=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -287,9 +302,13 @@ def refresh_data():
             # st.table(generation_schedule)
 
             # Process orders and calculate live schedule
-            live_schedule = process_orders_and_calculate_schedule(generation_schedule, orders)
+            live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
             st.write("Program de Generare Live:")
             st.table(live_schedule)
+            
+            # Play sound if schedule changed
+            if schedule_changed:
+                st.markdown("<script>playSound()</script>", unsafe_allow_html=True)
 
 # Button to trigger the SOAP request manually
 if st.sidebar.button("Obține Ordine de Dispecer"):
@@ -297,7 +316,8 @@ if st.sidebar.button("Obține Ordine de Dispecer"):
 
 # Auto-refresh every 30 seconds
 while True:
-    set_dates(auto_update)
+    date_from, date_to = set_dates(auto_update)
+    print(f"Date from: {date_from}, Date to: {date_to}")
     refresh_data()
     time.sleep(30)
     st.experimental_rerun()
