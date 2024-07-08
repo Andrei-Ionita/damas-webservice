@@ -230,7 +230,7 @@ audio_file = 'https://www.soundjay.com/button/beep-07.wav'
 def refresh_data():
     orders = []
     date_from, date_to = handle_dates()
-    st.write(date_from, date_to)
+    # st.write(date_from, date_to)
     response = get_dispatch_orders(date_from, date_to)
     
     # Fetch generation schedule
@@ -337,7 +337,7 @@ if auto_update:
     st.session_state.auto_update = True
 else:
     st.session_state.auto_update = False
-st.write(st.session_state.auto_update)
+# st.write(st.session_state.auto_update)
 
 # Auto-refresh every 30 seconds
 while True:
