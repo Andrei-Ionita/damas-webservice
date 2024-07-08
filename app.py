@@ -35,16 +35,6 @@ def convert_utc_to_eet(utc_time_str):
     eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
     return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
-# Sidebar inputs for date range
-def set_dates(auto_update):
-    if auto_update:
-        date_from = datetime.now().date()
-        date_to = (datetime.now() + timedelta(days=1)).date()
-    else:
-        date_from = st.sidebar.date_input("Data de început", value=datetime.now().date(), key="date_from")
-        date_to = st.sidebar.date_input("Data de sfârșit", value=(datetime.now() + timedelta(days=1)).date(), key="date_to")
-    return date_from, date_to
-
 # Function to simulate generation schedule response
 def get_generation_schedule():
     return """
@@ -203,28 +193,44 @@ st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
 
 # Add a checkbox for auto-update
+if 'auto_update' not in st.session_state:
+    st.session_state.auto_update = True
 auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 
-# Sidebar inputs for date range
-st.sidebar.header("Selectați Intervalul de Date")
-date_from = st.sidebar.date_input("Data de început", value=set_dates(auto_update)[0], key="date_from_input")
-date_to = st.sidebar.date_input("Data de sfârșit", value=set_dates(auto_update)[1], key="date_to_input")
+# Function to handle auto-update and date setting
+def handle_dates():
+    if st.session_state.auto_update:
+        # print("Auto-updating the dates")
+        st.session_state.date_from = datetime.now().date()
+        st.session_state.date_to = (datetime.now() + timedelta(days=1)).date()
+    else:
+        # print("Manually setting the dates")
+        if 'date_from' not in st.session_state:
+            st.session_state.date_from = None
+        if 'date_to' not in st.session_state:
+            st.session_state.date_to = None
+    return st.session_state.date_from, st.session_state.date_to
 
+# Sidebar inputs for date range
+if not auto_update:
+    st.sidebar.header("Selectați Intervalul de Date")
+    st.session_state.date_from = st.sidebar.date_input("Data de început")
+    st.session_state.date_to = st.sidebar.date_input("Data de sfârșit")
+# st.write(date_from, date_to)
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
 
-# JavaScript for playing sound
-st.markdown("""
-    <script>
-    function playSound() {
-        var audio = new Audio('https://www.soundjay.com/button/beep-07.wav');
-        audio.play();
-    }
-    </script>
-""", unsafe_allow_html=True)
+# Audio file for alert
+audio_file = 'https://www.soundjay.com/button/beep-07.wav'
+
+# if st.session_state.auto_update:
+#     st.session_state.date_from, st.session_state.date_to = handle_dates()
+# st.write(st.session_state.date_from, st.session_state.date_to)
 
 def refresh_data():
     orders = []
+    date_from, date_to = handle_dates()
+    st.write(date_from, date_to)
     response = get_dispatch_orders(date_from, date_to)
     
     # Fetch generation schedule
@@ -256,8 +262,8 @@ def refresh_data():
         if orders:
             # Sort orders by 'Ora de Start'
             orders = sorted(orders, key=lambda x: x['Ora de Start'])
-            # st.header("Ordine de Dispecer:", divider="gray")
-            # st.table(orders)
+            st.subheader("Ordine de Dispecer:", divider="gray")
+            st.table(orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
@@ -273,7 +279,13 @@ def refresh_data():
         
         # Play sound if schedule changed
         if schedule_changed:
-            st.markdown("<script>playSound()</script>", unsafe_allow_html=True)
+            st.audio(audio_file)
+            st.markdown(f"""
+                <script>
+                    var audio = new Audio('{audio_file}');
+                    audio.play();
+                </script>
+            """, unsafe_allow_html=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -303,21 +315,40 @@ def refresh_data():
 
             # Process orders and calculate live schedule
             live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
-            st.write("Program de Generare Live:")
+            st.header("Program de Generare Live:", divider="gray")
             st.table(live_schedule)
             
             # Play sound if schedule changed
             if schedule_changed:
-                st.markdown("<script>playSound()</script>", unsafe_allow_html=True)
+                st.audio(audio_file)
+                st.markdown(f"""
+                    <script>
+                        var audio = new Audio('{audio_file}');
+                        audio.play();
+                    </script>
+                """, unsafe_allow_html=True)
 
 # Button to trigger the SOAP request manually
-if st.sidebar.button("Obține Ordine de Dispecer"):
-    refresh_data()
+if not auto_update:
+    if st.sidebar.button("Obține Ordine de Dispecer"):
+        refresh_data()
+
+if auto_update:
+    st.session_state.auto_update = True
+else:
+    st.session_state.auto_update = False
+st.write(st.session_state.auto_update)
 
 # Auto-refresh every 30 seconds
 while True:
-    date_from, date_to = set_dates(auto_update)
-    print(f"Date from: {date_from}, Date to: {date_to}")
+    # st.write(st.session_state.date_from, st.session_state.date_to)
+    if st.session_state.auto_update:
+        print("Auto-updating")
+    else:
+        print("Manually updating")
+    if st.session_state.auto_update:
+        st.session_state.date_from, st.session_state.date_to = handle_dates()
+        # st.write(st.session_state.date_from, st.session_state.date_to)
     refresh_data()
     time.sleep(30)
-    st.experimental_rerun()
+    st.rerun()
