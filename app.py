@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 import xml.etree.ElementTree as ET
 import numpy as np
+import pytz
 
 # Set the page title
 st.set_page_config(page_title="Client Web Service Damas", layout="wide")
@@ -202,6 +203,12 @@ def handle_dates():
             st.session_state.date_to = None
     return st.session_state.date_from, st.session_state.date_to
 
+# Function to update the clock
+def update_clock():
+    eet_timezone = pytz.timezone('Europe/Bucharest')
+    current_time = datetime.now(eet_timezone).strftime("%Y-%m-%d %H:%M:%S")
+    clock_placeholder.markdown(f"<h1 style='text-align: right;'>{current_time}</h1>", unsafe_allow_html=True)
+
 # Main section
 st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
@@ -221,6 +228,9 @@ dispatch_orders_placeholder = st.empty()
 
 # Use a different audio file URL
 audio_file = "./mixkit-classic-alarm-995.wav"
+
+# Placeholder for the clock
+clock_placeholder = st.empty()
 
 # if st.session_state.auto_update:
 #     st.session_state.date_from, st.session_state.date_to = handle_dates()
@@ -332,5 +342,8 @@ while True:
     if auto_update and not manual_selection:
         date_from, date_to = handle_dates()
         refresh_data(date_from, date_to)
-    time.sleep(30)
+    for _ in range(30):
+        update_clock()
+        time.sleep(1)
     st.rerun()
+    
