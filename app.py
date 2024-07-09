@@ -188,15 +188,6 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
 
     return live_schedule, schedule_changed
 
-# Main section
-st.title("Client Web Service Damas")
-st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
-
-# Add a checkbox for auto-update
-if 'auto_update' not in st.session_state:
-    st.session_state.auto_update = True
-auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
-
 # Function to handle auto-update and date setting
 def handle_dates():
     if st.session_state.auto_update:
@@ -211,25 +202,33 @@ def handle_dates():
             st.session_state.date_to = None
     return st.session_state.date_from, st.session_state.date_to
 
+# Main section
+st.title("Client Web Service Damas")
+st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
+
+# Add a checkbox for auto-update
+if 'auto_update' not in st.session_state:
+    st.session_state.auto_update = True
+auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
+
 # Sidebar inputs for date range
-if not auto_update:
-    st.sidebar.header("Selectați Intervalul de Date")
-    st.session_state.date_from = st.sidebar.date_input("Data de început")
-    st.session_state.date_to = st.sidebar.date_input("Data de sfârșit")
+st.sidebar.header("Selectați Intervalul de Date")
+date_from_user = st.sidebar.date_input("Data de început", value=datetime.now().date())
+date_to_user = st.sidebar.date_input("Data de sfârșit", value = (datetime.now() + timedelta(days=1)).date())
 # st.write(date_from, date_to)
 # Placeholder for dispatch orders
 dispatch_orders_placeholder = st.empty()
 
-# Audio file for alert
-audio_file = 'https://www.soundjay.com/button/beep-07.wav'
+# Use a different audio file URL
+audio_file = "./mixkit-classic-alarm-995.wav"
 
 # if st.session_state.auto_update:
 #     st.session_state.date_from, st.session_state.date_to = handle_dates()
 # st.write(st.session_state.date_from, st.session_state.date_to)
 
-def refresh_data():
+def refresh_data(date_from, date_to):
     orders = []
-    date_from, date_to = handle_dates()
+    # date_from, date_to = handle_dates()
     # st.write(date_from, date_to)
     response = get_dispatch_orders(date_from, date_to)
     
@@ -262,8 +261,6 @@ def refresh_data():
         if orders:
             # Sort orders by 'Ora de Start'
             orders = sorted(orders, key=lambda x: x['Ora de Start'])
-            st.subheader("Ordine de Dispecer:", divider="gray")
-            st.table(orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
@@ -279,13 +276,7 @@ def refresh_data():
         
         # Play sound if schedule changed
         if schedule_changed:
-            st.audio(audio_file)
-            st.markdown(f"""
-                <script>
-                    var audio = new Audio('{audio_file}');
-                    audio.play();
-                </script>
-            """, unsafe_allow_html=True)
+            st.audio(audio_file, end_time=7, autoplay=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -320,19 +311,16 @@ def refresh_data():
             
             # Play sound if schedule changed
             if schedule_changed:
-                st.audio(audio_file)
-                st.markdown(f"""
-                    <script>
-                        var audio = new Audio('{audio_file}');
-                        audio.play();
-                    </script>
-                """, unsafe_allow_html=True)
+                st.audio(audio_file, end_time=7, autoplay=True)
+    if orders:
+        st.subheader("Ordine de Dispecer:", divider="gray")
+        st.table(orders)
 
+manual_selection = False
 # Button to trigger the SOAP request manually
-if not auto_update:
-    if st.sidebar.button("Obține Ordine de Dispecer"):
-        refresh_data()
-
+if st.sidebar.button("Obține Ordine de Dispecer"):
+    refresh_data(date_from_user, date_to_user)
+    manual_selection = True
 if auto_update:
     st.session_state.auto_update = True
 else:
@@ -341,14 +329,8 @@ else:
 
 # Auto-refresh every 30 seconds
 while True:
-    # st.write(st.session_state.date_from, st.session_state.date_to)
-    if st.session_state.auto_update:
-        print("Auto-updating")
-    else:
-        print("Manually updating")
-    if st.session_state.auto_update:
-        st.session_state.date_from, st.session_state.date_to = handle_dates()
-        # st.write(st.session_state.date_from, st.session_state.date_to)
-    refresh_data()
+    if auto_update and not manual_selection:
+        date_from, date_to = handle_dates()
+        refresh_data(date_from, date_to)
     time.sleep(30)
     st.rerun()
