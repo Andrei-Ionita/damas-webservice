@@ -192,9 +192,9 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
 # Function to handle auto-update and date setting
 def handle_dates():
     if st.session_state.auto_update:
-        # print("Auto-updating the dates")
-        st.session_state.date_from = datetime.now().date()
-        st.session_state.date_to = (datetime.now() + timedelta(days=1)).date()
+        eet_timezone = pytz.timezone('Europe/Bucharest')
+        st.session_state.date_from = datetime.now(eet_timezone).date()
+        st.session_state.date_to = (datetime.now(eet_timezone) + timedelta(days=1)).date()
     else:
         # print("Manually setting the dates")
         if 'date_from' not in st.session_state:
@@ -237,6 +237,7 @@ clock_placeholder = st.empty()
 # st.write(st.session_state.date_from, st.session_state.date_to)
 
 def refresh_data(date_from, date_to):
+    print(date_from, date_to)
     orders = []
     # date_from, date_to = handle_dates()
     # st.write(date_from, date_to)
