@@ -87,17 +87,21 @@ def get_generation_schedule():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-07-16T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-07-17T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
-        hour = start_time.hour + 3  # Adjust for EET (UTC+3 in summer)
-        if 0 <= hour < 7 or 10 <= hour < 16:
+        hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
+        
+        if 0 <= hour < 10:
+            power = 8.6
+        elif 10 <= hour < 16:
             power = 4.3
-        elif 7 <= hour < 10 or 16 <= hour < 24:
+        elif 16 <= hour < 19:
             power = 8.6
         else:
-            power = 0.0  # Just in case
+            power = 4.3
+        
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -105,6 +109,7 @@ def create_tomorrows_generation_schedule():
             "Bandă reglare [MW]": 0
         })
     return intervals
+
 
 
 def create_2days_ahead_generation_schedule():
@@ -269,7 +274,7 @@ def refresh_data(date_from, date_to):
     response_schedule = get_generation_schedule()
     # Manually create tomorrow's generation schedule if today is 03.07.2024
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 7, 17).date():
+    if current_date == datetime(2024, 7, 18).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 7, 4).date():
         generation_schedule = create_2days_ahead_generation_schedule()
