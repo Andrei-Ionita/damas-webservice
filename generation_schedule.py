@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 import xml.etree.ElementTree as ET
 import numpy as np
+import pytz
 
 # Set the page title
 st.set_page_config(page_title="Client Web Service Damas", layout="wide")
@@ -68,14 +69,74 @@ def get_generation_schedule():
     </env:Envelope>
     """.format(points="".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)]))
 
-# Function to manually create tomorrow's generation schedule with 0 MW from 00:00 to 19:00 EET
+# Function to convert a time to UTC string format
+def to_utc_string(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+# Function to simulate generation schedule response
+def get_generation_schedule_manually():
+    eet_timezone = pytz.timezone('Europe/Bucharest')
+    # Get current date in EET and adjust times to EET
+    base_time = datetime.now(eet_timezone).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    points = []
+    for i in range(96):
+        point_time = base_time + timedelta(minutes=15 * i)
+        point_time_utc = point_time.astimezone(pytz.utc)
+        points.append(f"<Point><position>{i+1}</position><quantity>4.3</quantity><time>{to_utc_string(point_time_utc)}</time></Point>")
+    
+    return """
+    <env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">
+        <env:Header/>
+        <env:Body>
+            <ns2:RunSynchronousResponse xmlns:ns2="http://markets.transelectrica.ro/wse">
+                <ns2:Output>
+                    <ns2:RQID>-1</ns2:RQID>
+                    <ns2:Result>
+                        <GenerationSchedule_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2">
+                            <TimeSeries>
+                                <Period>
+                                    <timeInterval>
+                                        <start>{start}</start>
+                                        <end>{end}</end>
+                                    </timeInterval>
+                                    <Resolution>PT15M</Resolution>
+                                    {points}
+                                </Period>
+                            </TimeSeries>
+                        </GenerationSchedule_MarketDocument>
+                    </ns2:Result>
+                    <ns2:RQState>
+                        <ns2:Code>COMPLETED</ns2:Code>
+                        <ns2:Description>The request is completed.</ns2:Description>
+                    </ns2:RQState>
+                </ns2:Output>
+            </ns2:RunSynchronousResponse>
+        </env:Body>
+    </env:Envelope>
+    """.format(
+        start=to_utc_string(base_time.astimezone(pytz.utc)),
+        end=to_utc_string((base_time + timedelta(hours=24) - timedelta(minutes=15)).astimezone(pytz.utc)),
+        points="".join(points)
+    )
+
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-07-02T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-07-17T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
-        power = 0.0 if start_time >= datetime.strptime("2024-07-03T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 4.3
+        hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
+        
+        if 0 <= hour < 10:
+            power = 8.6
+        elif 10 <= hour < 16:
+            power = 4.3
+        elif 16 <= hour < 19:
+            power = 8.6
+        else:
+            power = 4.3
+        
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -94,6 +155,22 @@ def create_2days_ahead_generation_schedule():
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "Punct de bază [MW]": power,
+            "Bandă reglare [MW]": 0
+        })
+    return intervals
+
+def create_standard_generation_schedule(date_from):
+    intervals = []
+    base_time = datetime.combine(date_from, datetime.min.time())
+    for i in range(96):
+        start_time = base_time + timedelta(minutes=15 * i)
+        end_time = start_time + timedelta(minutes=15)
+        power = 4.3  # Standard power output for the entire day
+        
+        intervals.append({
+            "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%S")),
+            "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%S")),
             "Punct de bază [MW]": power,
             "Bandă reglare [MW]": 0
         })
@@ -188,6 +265,25 @@ def process_orders_and_calculate_schedule(generation_schedule, orders):
 
     return live_schedule, schedule_changed
 
+# Function to handle auto-update and date setting
+def handle_dates():
+    if st.session_state.auto_update:
+        eet_timezone = pytz.timezone('Europe/Bucharest')
+        st.session_state.date_from = datetime.now(eet_timezone).date()
+        st.session_state.date_to = (datetime.now(eet_timezone) + timedelta(days=1)).date()
+    else:
+        if 'date_from' not in st.session_state:
+            st.session_state.date_from = None
+        if 'date_to' not in st.session_state:
+            st.session_state.date_to = None
+    return st.session_state.date_from, st.session_state.date_to
+
+# Function to update the clock
+def update_clock():
+    eet_timezone = pytz.timezone('Europe/Bucharest')
+    current_time = datetime.now(eet_timezone).strftime("%Y-%m-%d %H:%M:%S")
+    clock_placeholder.markdown(f"<h1 style='text-align: right;'>{current_time}</h1>", unsafe_allow_html=True)
+
 # Main section
 st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
@@ -197,47 +293,28 @@ if 'auto_update' not in st.session_state:
     st.session_state.auto_update = True
 auto_update = st.sidebar.checkbox("Auto-Update Dates", value=True)
 
-# Function to handle auto-update and date setting
-def handle_dates():
-    if st.session_state.auto_update:
-        # print("Auto-updating the dates")
-        st.session_state.date_from = datetime.now().date()
-        st.session_state.date_to = (datetime.now() + timedelta(days=1)).date()
-    else:
-        # print("Manually setting the dates")
-        if 'date_from' not in st.session_state:
-            st.session_state.date_from = None
-        if 'date_to' not in st.session_state:
-            st.session_state.date_to = None
-    return st.session_state.date_from, st.session_state.date_to
-
 # Sidebar inputs for date range
-if not auto_update:
-    st.sidebar.header("Selectați Intervalul de Date")
-    st.session_state.date_from = st.sidebar.date_input("Data de început")
-    st.session_state.date_to = st.sidebar.date_input("Data de sfârșit")
-# st.write(date_from, date_to)
-# Placeholder for dispatch orders
+st.sidebar.header("Selectați Intervalul de Date")
+date_from_user = st.sidebar.date_input("Data de început", value=datetime.now().date())
+date_to_user = st.sidebar.date_input("Data de sfârșit", value = (datetime.now() + timedelta(days=1)).date())
 dispatch_orders_placeholder = st.empty()
 
-# Audio file for alert
-audio_file = 'https://www.soundjay.com/button/beep-07.wav'
+# Use a different audio file URL
+audio_file = "./mixkit-classic-alarm-995.wav"
 
-# if st.session_state.auto_update:
-#     st.session_state.date_from, st.session_state.date_to = handle_dates()
-# st.write(st.session_state.date_from, st.session_state.date_to)
+# Placeholder for the clock
+clock_placeholder = st.empty()
 
-def refresh_data():
+def refresh_data(date_from, date_to):
     orders = []
-    date_from, date_to = handle_dates()
-    st.write(date_from, date_to)
+    previous_order_count = st.session_state.get('previous_order_count', 0)
+
     response = get_dispatch_orders(date_from, date_to)
     
     # Fetch generation schedule
-    response_schedule = get_generation_schedule()
-    # Manually create tomorrow's generation schedule if today is 03.07.2024
+    response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 7, 3).date():
+    if current_date == datetime(2024, 7, 18).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 7, 4).date():
         generation_schedule = create_2days_ahead_generation_schedule()
@@ -262,30 +339,21 @@ def refresh_data():
         if orders:
             # Sort orders by 'Ora de Start'
             orders = sorted(orders, key=lambda x: x['Ora de Start'])
-            st.subheader("Ordine de Dispecer:", divider="gray")
-            st.table(orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
     if len(generation_schedule) > 0:
         generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
-        # st.write("Program de Generare:")
-        # st.table(generation_schedule)
 
         # Process orders and calculate live schedule
         live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
         st.write("Program de Generare Live:")
         st.table(live_schedule)
         
-        # Play sound if schedule changed
-        if schedule_changed:
-            st.audio(audio_file)
-            st.markdown(f"""
-                <script>
-                    var audio = new Audio('{audio_file}');
-                    audio.play();
-                </script>
-            """, unsafe_allow_html=True)
+        # Play sound if schedule changed or order count increased
+        if schedule_changed or len(orders) > previous_order_count:
+            st.session_state.previous_order_count = len(orders)
+            st.audio(audio_file, end_time=15, autoplay=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -295,60 +363,46 @@ def refresh_data():
             start_time_input = date_from  # Use the user input date directly as a date object
             initial_start_time = datetime.combine(start_time_input, datetime.min.time()) - timedelta(hours=3)  # Subtract 3 hours to get the initial start time
 
-            # Format 'initial_start_time' as a string in the required format
             initial_start_time_str = initial_start_time.strftime("%Y-%m-%dT%H:%MZ")
-
-            # Use the formatted string to calculate the 'start_time'
             start_time = datetime.strptime(initial_start_time_str, "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
-            # start_time = datetime.strptime(date_from.strftime("%Y-%m-%dT%H:%MZ") - timedelta(hours=3), "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
             end_time = start_time + timedelta(minutes=15)
             generation_schedule.append({
                 "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%S")),
                 "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%S")),
                 "Punct de bază [MW]": quantity,
-                "Bandă reglare [MW]": 0  # Assuming this remains 0 as per the example
+                "Bandă reglare [MW]": 0
             })
         if generation_schedule:
             generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
-            # st.write("Program de Generare:")
-            # st.table(generation_schedule)
 
             # Process orders and calculate live schedule
             live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
             st.header("Program de Generare Live:", divider="gray")
             st.table(live_schedule)
             
-            # Play sound if schedule changed
-            if schedule_changed:
-                st.audio(audio_file)
-                st.markdown(f"""
-                    <script>
-                        var audio = new Audio('{audio_file}');
-                        audio.play();
-                    </script>
-                """, unsafe_allow_html=True)
+            # Play sound if schedule changed or order count increased
+            if schedule_changed or len(orders) > previous_order_count:
+                st.session_state.previous_order_count = len(orders)
+                st.audio(audio_file, end_time=15, autoplay=True)
 
-# Button to trigger the SOAP request manually
-if not auto_update:
-    if st.sidebar.button("Obține Ordine de Dispecer"):
-        refresh_data()
+    if orders:
+        st.subheader("Ordine de Dispecer:", divider="gray")
+        st.table(orders)
 
+manual_selection = False
+if st.sidebar.button("Obține Ordine de Dispecer"):
+    refresh_data(date_from_user, date_to_user)
+    manual_selection = True
 if auto_update:
     st.session_state.auto_update = True
 else:
     st.session_state.auto_update = False
-st.write(st.session_state.auto_update)
 
-# Auto-refresh every 30 seconds
 while True:
-    # st.write(st.session_state.date_from, st.session_state.date_to)
-    if st.session_state.auto_update:
-        print("Auto-updating")
-    else:
-        print("Manually updating")
-    if st.session_state.auto_update:
-        st.session_state.date_from, st.session_state.date_to = handle_dates()
-        # st.write(st.session_state.date_from, st.session_state.date_to)
-    refresh_data()
-    time.sleep(30)
+    if auto_update and not manual_selection:
+        date_from, date_to = handle_dates()
+        refresh_data(date_from, date_to)
+    for _ in range(30):
+        update_clock()
+        time.sleep(1)
     st.rerun()
