@@ -391,7 +391,6 @@ def refresh_data(date_from, date_to):
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
-    st.write(datetime.strptime(orders[len(orders)-1]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date())
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
     refresh_data(date_from_user, date_to_user)
