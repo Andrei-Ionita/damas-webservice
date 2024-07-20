@@ -385,10 +385,13 @@ def refresh_data(date_from, date_to):
                 st.session_state.previous_order_count = len(orders)
                 st.audio(audio_file, end_time=15, autoplay=True)
 
-    if orders:
+    if orders and datetime.strptime(orders[0]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from:
         st.subheader("Ordine de Dispecer:", divider="gray")
         st.table(orders)
+    else:
+        dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
+    st.write(datetime.strptime(orders[len(orders)-1]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date())
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
     refresh_data(date_from_user, date_to_user)
