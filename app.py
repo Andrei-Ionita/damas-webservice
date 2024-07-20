@@ -288,6 +288,9 @@ def update_clock():
 st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
 
+if 'previous_order_count' not in st.session_state:
+    st.session_state.previous_order_count = 0
+
 # Add a checkbox for auto-update
 if 'auto_update' not in st.session_state:
     st.session_state.auto_update = True
@@ -320,6 +323,7 @@ def refresh_data(date_from, date_to):
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
+
     if response:
         # Parse the XML response
         root = ET.fromstring(response)
@@ -391,6 +395,7 @@ def refresh_data(date_from, date_to):
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
 
+    
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
     refresh_data(date_from_user, date_to_user)
