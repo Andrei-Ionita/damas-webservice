@@ -389,7 +389,7 @@ def refresh_data(date_from, date_to):
                 st.session_state.previous_order_count = len(orders)
                 st.audio(audio_file, end_time=15, autoplay=True)
 
-    if orders and datetime.strptime(orders[0]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from:
+    if orders and datetime.strptime(orders[0]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() > date_from:
         st.subheader("Ordine de Dispecer:", divider="gray")
         st.table(orders)
     else:
