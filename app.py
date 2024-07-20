@@ -304,11 +304,9 @@ audio_file = "./mixkit-classic-alarm-995.wav"
 # Placeholder for the clock
 clock_placeholder = st.empty()
 
-# Initialize order count variables
+# Initialize order count variables if not already set
 if 'previous_order_count' not in st.session_state:
     st.session_state.previous_order_count = 0
-if 'current_order_count' not in st.session_state:
-    st.session_state.current_order_count = 0
 
 def refresh_data(date_from, date_to):
     orders = []
@@ -355,12 +353,9 @@ def refresh_data(date_from, date_to):
         st.write("Program de Generare Live:")
         st.table(live_schedule)
         
-        # Update the current order count
-        st.session_state.current_order_count = len(orders)
-
-        # Play sound if schedule changed or order count increased
-        if schedule_changed or st.session_state.current_order_count > st.session_state.previous_order_count:
-            st.session_state.previous_order_count = st.session_state.current_order_count
+        # Check if the order count has changed
+        if len(orders) != st.session_state.previous_order_count:
+            st.session_state.previous_order_count = len(orders)
             st.audio(audio_file, end_time=15, autoplay=True)
 
     elif response_schedule:
@@ -388,12 +383,9 @@ def refresh_data(date_from, date_to):
             st.header("Program de Generare Live:", divider="gray")
             st.table(live_schedule)
             
-            # Update the current order count
-            st.session_state.current_order_count = len(orders)
-
-            # Play sound if schedule changed or order count increased
-            if schedule_changed or st.session_state.current_order_count > st.session_state.previous_order_count:
-                st.session_state.previous_order_count = st.session_state.current_order_count
+            # Check if the order count has changed
+            if len(orders) != st.session_state.previous_order_count:
+                st.session_state.previous_order_count = len(orders)
                 st.audio(audio_file, end_time=15, autoplay=True)
 
     # Filter orders for the current day
@@ -404,6 +396,7 @@ def refresh_data(date_from, date_to):
         st.table(current_day_orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru ziua curentă.")
+    print(st.session_state.previous_order_count)
 
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
