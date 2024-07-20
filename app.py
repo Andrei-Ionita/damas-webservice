@@ -287,10 +287,6 @@ def update_clock():
 # Main section
 st.title("Client Web Service Damas")
 st.write("Aplicația permite interacțiunea cu Web Service-ul Damas pentru a obține ordine de dispecer.")
-
-if 'previous_order_count' not in st.session_state:
-    st.session_state.previous_order_count = 0
-
 # Add a checkbox for auto-update
 if 'auto_update' not in st.session_state:
     st.session_state.auto_update = True
@@ -308,9 +304,14 @@ audio_file = "./mixkit-classic-alarm-995.wav"
 # Placeholder for the clock
 clock_placeholder = st.empty()
 
+# Initialize order count variables
+if 'previous_order_count' not in st.session_state:
+    st.session_state.previous_order_count = 0
+if 'current_order_count' not in st.session_state:
+    st.session_state.current_order_count = 0
+
 def refresh_data(date_from, date_to):
     orders = []
-    previous_order_count = st.session_state.get('previous_order_count', 0)
 
     response = get_dispatch_orders(date_from, date_to)
     
@@ -354,9 +355,12 @@ def refresh_data(date_from, date_to):
         st.write("Program de Generare Live:")
         st.table(live_schedule)
         
+        # Update the current order count
+        st.session_state.current_order_count = len(orders)
+
         # Play sound if schedule changed or order count increased
-        if schedule_changed or len(orders) > previous_order_count:
-            st.session_state.previous_order_count = len(orders)
+        if schedule_changed or st.session_state.current_order_count > st.session_state.previous_order_count:
+            st.session_state.previous_order_count = st.session_state.current_order_count
             st.audio(audio_file, end_time=15, autoplay=True)
 
     elif response_schedule:
@@ -384,19 +388,23 @@ def refresh_data(date_from, date_to):
             st.header("Program de Generare Live:", divider="gray")
             st.table(live_schedule)
             
+            # Update the current order count
+            st.session_state.current_order_count = len(orders)
+
             # Play sound if schedule changed or order count increased
-            if schedule_changed or len(orders) > previous_order_count:
-                st.session_state.previous_order_count = len(orders)
+            if schedule_changed or st.session_state.current_order_count > st.session_state.previous_order_count:
+                st.session_state.previous_order_count = st.session_state.current_order_count
                 st.audio(audio_file, end_time=15, autoplay=True)
 
-    # if orders and datetime.strptime(orders[0]["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from:
-    if orders:
-        st.subheader("Ordine de Dispecer:", divider="gray")
-        st.table(orders)
-    else:
-        dispatch_orders_placeholder.error("Nu exista ordine pentru perioada selectata.")
+    # Filter orders for the current day
+    current_day_orders = [order for order in orders if datetime.strptime(order["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from]
 
-    
+    if current_day_orders:
+        st.subheader("Ordine de Dispecer pentru ziua curentă:", divider="gray")
+        st.table(current_day_orders)
+    else:
+        dispatch_orders_placeholder.error("Nu exista ordine pentru ziua curentă.")
+
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
     refresh_data(date_from_user, date_to_user)
@@ -410,6 +418,7 @@ while True:
     if auto_update and not manual_selection:
         date_from, date_to = handle_dates()
         refresh_data(date_from, date_to)
+        
     for _ in range(30):
         update_clock()
         time.sleep(1)
