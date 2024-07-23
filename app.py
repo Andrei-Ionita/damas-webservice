@@ -6,6 +6,7 @@ import time
 import xml.etree.ElementTree as ET
 import numpy as np
 import pytz
+import base64
 
 # Set the page title
 st.set_page_config(page_title="Client Web Service Damas", layout="wide")
@@ -13,6 +14,17 @@ st.set_page_config(page_title="Client Web Service Damas", layout="wide")
 # Fetching credentials from Streamlit secrets
 ACCESS_CODE_1 = st.secrets["ACCESS_CODE_1"]
 ACCESS_CODE_2 = st.secrets["ACCESS_CODE_2"]
+
+def autoplay_audio(file_path: str):
+    with open(file_path, "rb") as f:
+        data = f.read()
+        b64 = base64.b64encode(data).decode()
+        md = f"""
+            <audio autoplay="true">
+            <source src="data:audio/wav;base64,{b64}" type="audio/wav">
+            </audio>
+            """
+        st.markdown(md, unsafe_allow_html=True)
 
 # Function to get the current timestamp
 def get_current_timestamp():
@@ -307,8 +319,9 @@ clock_placeholder = st.empty()
 # Initialize order count variables if not already set
 if 'previous_order_count' not in st.session_state:
     st.session_state.previous_order_count = 0
-
-def refresh_data(date_from, date_to):
+# st.write(st.session_state)
+def refresh_data(date_from, date_to, previous_order_count):
+    print("The numbers of orders when the function is called: {}".format(previous_order_count))
     orders = []
 
     response = get_dispatch_orders(date_from, date_to)
@@ -354,8 +367,8 @@ def refresh_data(date_from, date_to):
         st.table(live_schedule)
         
         # Check if the order count has changed
-        if len(orders) != st.session_state.previous_order_count:
-            st.session_state.previous_order_count = len(orders)
+        if len(orders) != previous_order_count:
+            previous_order_count = len(orders)
             st.audio(audio_file, end_time=15, autoplay=True)
 
     elif response_schedule:
@@ -382,12 +395,13 @@ def refresh_data(date_from, date_to):
             live_schedule, schedule_changed = process_orders_and_calculate_schedule(generation_schedule, orders)
             st.header("Program de Generare Live:", divider="gray")
             st.table(live_schedule)
-            
+            print(len(orders), previous_order_count)
             # Check if the order count has changed
-            if len(orders) != st.session_state.previous_order_count:
-                st.session_state.previous_order_count = len(orders)
-                st.audio(audio_file, end_time=15, autoplay=True)
-
+            if len(orders) != previous_order_count:
+                print("The alarm must be triggered!")
+                previous_order_count = len(orders)
+                # st.audio(audio_file, end_time=15, autoplay=True)
+                autoplay_audio(audio_file)
     # Filter orders for the current day
     current_day_orders = [order for order in orders if datetime.strptime(order["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from]
 
@@ -396,7 +410,7 @@ def refresh_data(date_from, date_to):
         st.table(current_day_orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru ziua curentă.")
-    print(st.session_state.previous_order_count)
+    return previous_order_count
 
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
@@ -410,8 +424,8 @@ else:
 while True:
     if auto_update and not manual_selection:
         date_from, date_to = handle_dates()
-        refresh_data(date_from, date_to)
-        
+        st.session_state.previous_order_count = refresh_data(date_from, date_to, st.session_state.previous_order_count)
+        # st.write(st.session_state)
     for _ in range(30):
         update_clock()
         time.sleep(1)
