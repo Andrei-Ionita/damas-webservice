@@ -372,7 +372,9 @@ def refresh_data(date_from, date_to, previous_order_count):
         # Check if the order count has changed
         if len(orders) != previous_order_count:
             previous_order_count = len(orders)
-            st.audio("./mixkit-classic-alarm-995.wav", format="audio/wav", loop=False, autoplay=True)
+            with open(audio_file, "rb") as f:
+                audio_bytes = f.read()
+            st.audio(audio_bytes, format="audio/wav", autoplay=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -403,9 +405,11 @@ def refresh_data(date_from, date_to, previous_order_count):
             if len(orders) != previous_order_count:
                 print("The alarm must be triggered!")
                 previous_order_count = len(orders)
-                st.audio("./mixkit-classic-alarm-995.wav", format="audio/wav", loop=False, autoplay=True)
+                # st.audio("./mixkit-classic-alarm-995.wav", format="audio/wav", loop=False, autoplay=True)
                 # autoplay_audio(audio_file)
-
+                with open(audio_file, "rb") as f:
+                    audio_bytes = f.read()
+                st.audio(audio_bytes, format="audio/wav", autoplay=True)
     # Filter orders for the current day
     current_day_orders = [order for order in orders if datetime.strptime(order["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from]
 
