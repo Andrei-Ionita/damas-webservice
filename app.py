@@ -16,15 +16,18 @@ ACCESS_CODE_1 = st.secrets["ACCESS_CODE_1"]
 ACCESS_CODE_2 = st.secrets["ACCESS_CODE_2"]
 
 def autoplay_audio(file_path: str):
-    with open(file_path, "rb") as f:
-        data = f.read()
-        b64 = base64.b64encode(data).decode()
-        md = f"""
-            <audio autoplay="true">
-            <source src="data:audio/wav;base64,{b64}" type="audio/wav">
-            </audio>
-            """
-        st.markdown(md, unsafe_allow_html=True)
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+            b64 = base64.b64encode(data).decode()
+            md = f"""
+                <audio autoplay="true">
+                <source src="data:audio/wav;base64,{b64}" type="audio/wav">
+                </audio>
+                """
+            st.markdown(md, unsafe_allow_html=True)
+    except FileNotFoundError:
+        print("Audio file not found. Please ensure the file exists.")
 
 # Function to get the current timestamp
 def get_current_timestamp():
@@ -134,20 +137,20 @@ def get_generation_schedule_manually():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-07-17T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-07-31T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 0 <= hour < 10:
-            power = 8.6
-        elif 10 <= hour < 16:
-            power = 4.3
-        elif 16 <= hour < 19:
-            power = 8.6
+        if 7 <= hour <=24:
+            power = 4
+        # elif 10 <= hour < 16:
+        #     power = 4.3
+        # elif 16 <= hour < 19:
+        #     power = 8.6
         else:
-            power = 4.3
+            power = 0
         
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -329,7 +332,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     # Fetch generation schedule
     response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 7, 18).date():
+    if current_date == datetime(2024, 8, 1).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 7, 4).date():
         generation_schedule = create_2days_ahead_generation_schedule()
@@ -369,7 +372,7 @@ def refresh_data(date_from, date_to, previous_order_count):
         # Check if the order count has changed
         if len(orders) != previous_order_count:
             previous_order_count = len(orders)
-            st.audio(audio_file, end_time=15, autoplay=True)
+            st.audio("./mixkit-classic-alarm-995.wav", format="audio/wav", loop=False, autoplay=True)
 
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
@@ -400,8 +403,9 @@ def refresh_data(date_from, date_to, previous_order_count):
             if len(orders) != previous_order_count:
                 print("The alarm must be triggered!")
                 previous_order_count = len(orders)
-                # st.audio(audio_file, end_time=15, autoplay=True)
-                autoplay_audio(audio_file)
+                st.audio("./mixkit-classic-alarm-995.wav", format="audio/wav", loop=False, autoplay=True)
+                # autoplay_audio(audio_file)
+
     # Filter orders for the current day
     current_day_orders = [order for order in orders if datetime.strptime(order["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from]
 
