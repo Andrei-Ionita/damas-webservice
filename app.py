@@ -137,14 +137,14 @@ def get_generation_schedule_manually():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-08-02T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-08-01T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 8 <= hour <=23:
-            power = 4.3
+        if 7 <= hour <=24:
+            power = 4
         # elif 10 <= hour < 16:
         #     power = 4.3
         # elif 16 <= hour < 19:
@@ -160,13 +160,38 @@ def create_tomorrows_generation_schedule():
         })
     return intervals
 
+# def create_2days_ahead_generation_schedule():
+#     intervals = []
+#     base_time = datetime.strptime("2024-07-03T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+#     for i in range(96):
+#         start_time = base_time + timedelta(minutes=15 * i)
+#         end_time = start_time + timedelta(minutes=15)
+#         power = 4.3 if start_time >= datetime.strptime("2024-08-04T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 0.0
+#         intervals.append({
+#             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+#             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+#             "Punct de bază [MW]": power,
+#             "Bandă reglare [MW]": 0
+#         })
+#     return intervals
+
 def create_2days_ahead_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-07-03T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-08-02T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
-        power = 4.3 if start_time >= datetime.strptime("2024-07-04T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 0.0
+        hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
+        
+        if 8 <= hour <=23:
+            power = 4.3
+        # elif 10 <= hour < 16:
+        #     power = 4.3
+        # elif 16 <= hour < 19:
+        #     power = 8.6
+        else:
+            power = 0
+        
         intervals.append({
             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -332,9 +357,9 @@ def refresh_data(date_from, date_to, previous_order_count):
     # Fetch generation schedule
     response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 8, 3).date():
+    if current_date == datetime(2024, 8, 2).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 7, 4).date():
+    elif current_date == datetime(2024, 8, 3).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
