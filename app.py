@@ -183,7 +183,7 @@ def create_2days_ahead_generation_schedule():
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 8 <= hour <=23:
+        if 8 <= hour <= 22:
             power = 4.3
         # elif 10 <= hour < 16:
         #     power = 4.3
