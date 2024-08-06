@@ -439,7 +439,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     current_day_orders = [order for order in orders if datetime.strptime(order["Ora de Start"], '%Y-%m-%d %H:%M:%S').date() == date_from]
 
     if current_day_orders:
-        st.subheader("Ordine de Dispecer pentru ziua curentă:", divider="gray")
+        st.subheader("Ordine de Dispecer:", divider="gray")
         st.table(current_day_orders)
     else:
         dispatch_orders_placeholder.error("Nu exista ordine pentru ziua curentă.")
@@ -447,7 +447,7 @@ def refresh_data(date_from, date_to, previous_order_count):
 
 manual_selection = False
 if st.sidebar.button("Obține Ordine de Dispecer"):
-    refresh_data(date_from_user, date_to_user)
+    refresh_data(date_from_user, date_to_user, st.session_state.previous_order_count)
     manual_selection = True
 if auto_update:
     st.session_state.auto_update = True
