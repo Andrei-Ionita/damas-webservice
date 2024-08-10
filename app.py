@@ -143,7 +143,7 @@ def create_tomorrows_generation_schedule():
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 6 <= hour <=24:
+        if 18 <= hour <=24:
             power = 4.3
         # elif 17 <= hour <= 24:
         #     power = 4.3
@@ -183,7 +183,7 @@ def create_2days_ahead_generation_schedule():
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 8 <= hour <= 22:
+        if 18 <= hour <= 24:
             power = 4.3
         # elif 10 <= hour < 16:
         #     power = 4.3
@@ -357,7 +357,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     # Fetch generation schedule
     response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 8, 9).date():
+    if current_date == datetime(2024, 8, 11).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 8, 10).date():
         generation_schedule = create_2days_ahead_generation_schedule()
