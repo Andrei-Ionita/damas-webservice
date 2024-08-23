@@ -177,7 +177,7 @@ def create_tomorrows_generation_schedule():
 
 def create_2days_ahead_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-08-21T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-08-22T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
@@ -359,7 +359,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     current_date = datetime.now().date()
     if current_date == datetime(2024, 8, 23).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 8, 22).date():
+    elif current_date == datetime(2024, 8, 24).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
