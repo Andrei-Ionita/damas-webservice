@@ -177,13 +177,13 @@ def create_tomorrows_generation_schedule():
 
 def create_2days_ahead_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-08-22T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-08-24T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 7 <= hour <= 24:
+        if 17 <= hour <= 24:
             power = 4
         # elif 10 <= hour < 16:
         #     power = 4.3
