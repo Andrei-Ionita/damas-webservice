@@ -143,7 +143,7 @@ def create_tomorrows_generation_schedule():
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 3) % 24  # Adjust for EET (UTC+3 in summer)
         
-        if 6 <= hour <=12:
+        if 6 <= hour <=11:
             power = 4
         elif 16 <= hour <= 24:
             power = 4
