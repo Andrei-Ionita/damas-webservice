@@ -48,7 +48,7 @@ def convert_utc_to_eet(utc_time_str):
         except ValueError:
             utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M")
     # Convert to EET (UTC+2) and account for daylight saving (UTC+3 during summer)
-    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 11) else 2)
+    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
     return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
 # Function to simulate generation schedule response
