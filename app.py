@@ -137,12 +137,12 @@ def get_generation_schedule_manually():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-10-28T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-10-30T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
         hour = (start_time.hour + 2) % 24  # Adjust for EET (UTC+2 in winter)
-        if 7 <= hour <=24:
+        if 0 <= hour <=24:
             power = 4
         # elif 17 <= hour <= 24:
         #     power = 4
@@ -354,7 +354,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     # Fetch generation schedule
     response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 10, 29).date():
+    if current_date == datetime(2024, 10, 31).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 10, 30).date():
         generation_schedule = create_2days_ahead_generation_schedule()
