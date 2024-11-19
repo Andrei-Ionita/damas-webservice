@@ -137,7 +137,7 @@ def get_generation_schedule_manually():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-11-17T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-11-19T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
@@ -156,21 +156,6 @@ def create_tomorrows_generation_schedule():
             "Bandă reglare [MW]": 0
         })
     return intervals
-
-# def create_2days_ahead_generation_schedule():
-#     intervals = []
-#     base_time = datetime.strptime("2024-07-03T21:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
-#     for i in range(96):
-#         start_time = base_time + timedelta(minutes=15 * i)
-#         end_time = start_time + timedelta(minutes=15)
-#         power = 4.3 if start_time >= datetime.strptime("2024-08-04T16:00:00Z", "%Y-%m-%dT%H:%M:%SZ") else 0.0
-#         intervals.append({
-#             "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
-#             "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%SZ")),
-#             "Punct de bază [MW]": power,
-#             "Bandă reglare [MW]": 0
-#         })
-#     return intervals
 
 def create_2days_ahead_generation_schedule():
     intervals = []
@@ -354,7 +339,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     # Fetch generation schedule
     response_schedule = get_generation_schedule_manually()
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 11, 18).date():
+    if current_date == datetime(2024, 11, 20).date():
         generation_schedule = create_tomorrows_generation_schedule()
     elif current_date == datetime(2024, 11, 19).date():
         generation_schedule = create_2days_ahead_generation_schedule()
