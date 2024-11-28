@@ -159,7 +159,7 @@ def create_tomorrows_generation_schedule():
 
 def create_2days_ahead_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-11-26T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-11-28T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
@@ -198,10 +198,9 @@ def create_standard_generation_schedule(date_from):
         })
     return intervals
 
-# Function to send SOAP request for dispatch orders
-def get_dispatch_orders(date_from, date_to):
+# Function to send SOAP request for Generation Schedule
+def get_generation_schedule(date_from, date_to):
     created, expires = get_current_timestamp()
-    date_to = date_to - timedelta(days=1)
     # SOAP request XML
     soap_request = f"""
     <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wse="http://markets.transelectrica.ro/wse">
@@ -220,7 +219,7 @@ def get_dispatch_orders(date_from, date_to):
         <soap:Body>
             <wse:RunSynchronous>
                 <wse:Input>
-                    <wse:FID>DISPATCH_ORDERS_MANUAL_DOWNLOAD_XML_OUT</wse:FID>
+                    <wse:FID>GENERATION_SCHEDULES_MANUAL_DOWNLOAD_XML_OUT</wse:FID>
                     <wse:Parameters>
                         <wse:DateParam Name="DateFrom">{date_from}</wse:DateParam>
                         <wse:DateParam Name="DateTo">{date_to}</wse:DateParam>
@@ -236,11 +235,16 @@ def get_dispatch_orders(date_from, date_to):
     }
 
     # Send the SOAP request
-    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws", data=soap_request, headers=headers)
+    response = requests.post(
+        "https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws",
+        data=soap_request,
+        headers=headers
+    )
 
     if response.status_code == 200:
         return response.content
     else:
+        print(f"Error: {response.status_code}, {response.text}")
         return None
 
 def process_orders_and_calculate_schedule(generation_schedule, orders):
@@ -341,7 +345,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     current_date = datetime.now().date()
     if current_date == datetime(2024, 11, 28).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 11, 27).date():
+    elif current_date == datetime(2024, 11, 29).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
