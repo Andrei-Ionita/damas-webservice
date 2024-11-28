@@ -198,9 +198,10 @@ def create_standard_generation_schedule(date_from):
         })
     return intervals
 
-# Function to send SOAP request for Generation Schedule
-def get_generation_schedule(date_from, date_to):
+# Function to send SOAP request for dispatch orders
+def get_dispatch_orders(date_from, date_to):
     created, expires = get_current_timestamp()
+    date_to = date_to - timedelta(days=1)
     # SOAP request XML
     soap_request = f"""
     <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wse="http://markets.transelectrica.ro/wse">
@@ -219,7 +220,7 @@ def get_generation_schedule(date_from, date_to):
         <soap:Body>
             <wse:RunSynchronous>
                 <wse:Input>
-                    <wse:FID>GENERATION_SCHEDULES_MANUAL_DOWNLOAD_XML_OUT</wse:FID>
+                    <wse:FID>DISPATCH_ORDERS_MANUAL_DOWNLOAD_XML_OUT</wse:FID>
                     <wse:Parameters>
                         <wse:DateParam Name="DateFrom">{date_from}</wse:DateParam>
                         <wse:DateParam Name="DateTo">{date_to}</wse:DateParam>
@@ -235,16 +236,11 @@ def get_generation_schedule(date_from, date_to):
     }
 
     # Send the SOAP request
-    response = requests.post(
-        "https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws",
-        data=soap_request,
-        headers=headers
-    )
+    response = requests.post("https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws", data=soap_request, headers=headers)
 
     if response.status_code == 200:
         return response.content
     else:
-        print(f"Error: {response.status_code}, {response.text}")
         return None
 
 def process_orders_and_calculate_schedule(generation_schedule, orders):
