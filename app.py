@@ -48,41 +48,57 @@ def convert_utc_to_eet(utc_time_str):
         except ValueError:
             utc_time = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M")
     # Convert to EET (UTC+2) and account for daylight saving (UTC+3 during summer)
-    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 10) else 2)
+    eet_time = utc_time + timedelta(hours=3 if (utc_time.month >= 4 and utc_time.month < 11) else 2)
     return eet_time.strftime("%Y-%m-%d %H:%M:%S")
 
-# Function to simulate generation schedule response
-def get_generation_schedule():
-    return """
-    <env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">
-        <env:Header/>
-        <env:Body>
-            <ns2:RunSynchronousResponse xmlns:ns2="http://markets.transelectrica.ro/wse">
-                <ns2:Output>
-                    <ns2:RQID>-1</ns2:RQID>
-                    <ns2:Result>
-                        <GenerationSchedule_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2">
-                            <TimeSeries>
-                                <Period>
-                                    <timeInterval>
-                                        <start>2024-06-26T00:00Z</start>
-                                        <end>2024-06-26T23:45Z</end>
-                                    </timeInterval>
-                                    <Resolution>PT15M</Resolution>
-                                    {points}
-                                </Period>
-                            </TimeSeries>
-                        </GenerationSchedule_MarketDocument>
-                    </ns2:Result>
-                    <ns2:RQState>
-                        <ns2:Code>COMPLETED</ns2:Code>
-                        <ns2:Description>The request is completed.</ns2:Description>
-                    </ns2:RQState>
-                </ns2:Output>
-            </ns2:RunSynchronousResponse>
-        </env:Body>
-    </env:Envelope>
-    """.format(points="".join([f"<Point><position>{i+1}</position><quantity>4.3</quantity></Point>" for i in range(96)]))
+# Function to send SOAP request for Generation Schedule
+def get_generation_schedule(date_from, date_to):
+    created, expires = get_current_timestamp()
+    # SOAP request XML
+    soap_request = f"""
+    <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wse="http://markets.transelectrica.ro/wse">
+        <soap:Header>
+            <wsse:Security soap:mustUnderstand="true" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+                <wsse:UsernameToken wsu:Id="username_token_id">
+                    <wsse:Username>{ACCESS_CODE_1}</wsse:Username>
+                    <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText">{ACCESS_CODE_2}</wsse:Password>
+                </wsse:UsernameToken>
+                <wsu:Timestamp wsu:Id="timestamp_id">
+                    <wsu:Created>{created}</wsu:Created>
+                    <wsu:Expires>{expires}</wsu:Expires>
+                </wsu:Timestamp>
+            </wsse:Security>
+        </soap:Header>
+        <soap:Body>
+            <wse:RunSynchronous>
+                <wse:Input>
+                    <wse:FID>GENERATION_SCHEDULES_MANUAL_DOWNLOAD_XML_OUT</wse:FID>
+                    <wse:Parameters>
+                        <wse:DateParam Name="DateFrom">{date_from}</wse:DateParam>
+                        <wse:DateParam Name="DateTo">{date_to}</wse:DateParam>
+                    </wse:Parameters>
+                </wse:Input>
+            </wse:RunSynchronous>
+        </soap:Body>
+    </soap:Envelope>
+    """
+
+    headers = {
+        'Content-Type': 'application/soap+xml;charset=UTF-8;action="http://markets.transelectrica.ro/wse/RunSynchronous"',
+    }
+
+    # Send the SOAP request
+    response = requests.post(
+        "https://newmarkets.transelectrica.ro/usy-durom-wsendpointg01/00121002300000000000000000000100/ws",
+        data=soap_request,
+        headers=headers
+    )
+
+    if response.status_code == 200:
+        return response.content
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
 
 # Function to convert a time to UTC string format
 def to_utc_string(dt):
@@ -337,7 +353,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     response = get_dispatch_orders(date_from, date_to)
     
     # Fetch generation schedule
-    response_schedule = get_generation_schedule_manually()
+    response_schedule = get_generation_schedule(date_from, date_to)
     current_date = datetime.now().date()
     if current_date == datetime(2024, 11, 28).date():
         generation_schedule = create_tomorrows_generation_schedule()
@@ -382,7 +398,7 @@ def refresh_data(date_from, date_to, previous_order_count):
             with open(audio_file, "rb") as f:
                 audio_bytes = f.read()
             st.audio(audio_bytes, format="audio/wav", autoplay=True)
-
+       
     elif response_schedule:
         root_schedule = ET.fromstring(response_schedule)
         for point in root_schedule.findall(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}Point"):
