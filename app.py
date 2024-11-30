@@ -153,7 +153,7 @@ def get_generation_schedule_manually():
 
 def create_tomorrows_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-11-27T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-11-29T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
@@ -175,7 +175,7 @@ def create_tomorrows_generation_schedule():
 
 def create_2days_ahead_generation_schedule():
     intervals = []
-    base_time = datetime.strptime("2024-11-28T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+    base_time = datetime.strptime("2024-11-30T22:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
     for i in range(96):
         start_time = base_time + timedelta(minutes=15 * i)
         end_time = start_time + timedelta(minutes=15)
@@ -354,10 +354,11 @@ def refresh_data(date_from, date_to, previous_order_count):
     
     # Fetch generation schedule
     response_schedule = get_generation_schedule(date_from, date_to)
+
     current_date = datetime.now().date()
-    if current_date == datetime(2024, 11, 28).date():
+    if current_date == datetime(2024, 11, 30).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 11, 29).date():
+    elif current_date == datetime(2024, 12, 1).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
@@ -405,7 +406,7 @@ def refresh_data(date_from, date_to, previous_order_count):
             position = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}position").text
             quantity = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}quantity").text
             start_time_input = date_from  # Use the user input date directly as a date object
-            initial_start_time = datetime.combine(start_time_input, datetime.min.time()) - timedelta(hours=3)  # Subtract 3 hours to get the initial start time
+            initial_start_time = datetime.combine(start_time_input, datetime.min.time()) - timedelta(hours=2)  # Subtract 3 hours to get the initial start time
 
             initial_start_time_str = initial_start_time.strftime("%Y-%m-%dT%H:%MZ")
             start_time = datetime.strptime(initial_start_time_str, "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
@@ -416,6 +417,7 @@ def refresh_data(date_from, date_to, previous_order_count):
                 "Punct de bază [MW]": quantity,
                 "Bandă reglare [MW]": 0
             })
+            
         if generation_schedule:
             generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
 
