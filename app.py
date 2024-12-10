@@ -358,7 +358,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     current_date = datetime.now().date()
     if current_date == datetime(2024, 12, 9).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 12, 10).date():
+    elif current_date == datetime(2024, 12, 8).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
