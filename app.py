@@ -100,6 +100,82 @@ def get_generation_schedule(date_from, date_to):
         print(f"Error: {response.status_code}, {response.text}")
         return None
 
+
+def parse_generation_schedule(response_schedule, date_from):
+    """
+    Parse the generation schedule XML response and create a structured schedule.
+
+    Args:
+        response_schedule (str): The XML response as a string.
+        date_from (datetime.date): The starting date for the schedule.
+
+    Returns:
+        list[dict]: The parsed generation schedule.
+    """
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timedelta
+
+    # Parse the XML response
+    try:
+        root_schedule = ET.fromstring(response_schedule)
+    except ET.ParseError as e:
+        print("XML Parse Error:", e)
+        return []
+
+    # Define namespaces
+    namespaces = {
+        "soap": "http://www.w3.org/2003/05/soap-envelope",
+        "ns1": "http://markets.transelectrica.ro/wse"
+    }
+
+    print("Root Element:", root_schedule.tag)
+
+    # Locate the schedule intervals
+    intervals = root_schedule.findall(".//ns1:Interval", namespaces=namespaces)
+    print("Matched Intervals Count:", len(intervals))
+
+    if not intervals:
+        print("No intervals found in the XML. Check namespaces or structure.")
+        return []
+
+    # Process intervals into a structured schedule
+    generation_schedule = []
+    for interval in intervals:
+        print("Interval Element:", ET.tostring(interval, encoding="unicode"))
+
+        pos_elem = interval.find("ns1:Pos", namespaces=namespaces)
+        qty_elem = interval.find("ns1:Qty", namespaces=namespaces)
+
+        if pos_elem is None or qty_elem is None:
+            print("Missing 'Pos' or 'Qty' in Interval. Skipping.")
+            continue
+
+        # Retrieve attributes instead of text
+        position = pos_elem.get("v")
+        quantity = qty_elem.get("v")
+
+        try:
+            position = int(position)
+            quantity = float(quantity)
+        except (ValueError, TypeError) as e:
+            print(f"Error parsing Pos or Qty: {e}")
+            continue
+
+        # Calculate time intervals
+        initial_start_time = datetime.combine(date_from, datetime.min.time()) - timedelta(hours=2)  # Adjust for EET
+        start_time = initial_start_time + timedelta(minutes=15 * (position - 1))
+        end_time = start_time + timedelta(minutes=15)
+
+        generation_schedule.append({
+            "Ora de Inceput": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "Ora de Sfarsit": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "Punct de bază [MW]": quantity,
+            "Bandă reglare [MW]": 0
+        })
+
+    return generation_schedule
+
+
 # Function to convert a time to UTC string format
 def to_utc_string(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -358,7 +434,7 @@ def refresh_data(date_from, date_to, previous_order_count):
     current_date = datetime.now().date()
     if current_date == datetime(2024, 12, 9).date():
         generation_schedule = create_tomorrows_generation_schedule()
-    elif current_date == datetime(2024, 12, 10).date():
+    elif current_date == datetime(2024, 12, 8).date():
         generation_schedule = create_2days_ahead_generation_schedule()
     else:
         generation_schedule = []  # Replace with your usual generation schedule fetching logic
@@ -401,23 +477,8 @@ def refresh_data(date_from, date_to, previous_order_count):
             st.audio(audio_bytes, format="audio/wav", autoplay=True)
        
     elif response_schedule:
-        root_schedule = ET.fromstring(response_schedule)
-        for point in root_schedule.findall(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}Point"):
-            position = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}position").text
-            quantity = point.find(".//{urn:iec62325.351:tc57wg16:451-7:generationdocument:7:2}quantity").text
-            start_time_input = date_from  # Use the user input date directly as a date object
-            initial_start_time = datetime.combine(start_time_input, datetime.min.time()) - timedelta(hours=2)  # Subtract 3 hours to get the initial start time
-
-            initial_start_time_str = initial_start_time.strftime("%Y-%m-%dT%H:%MZ")
-            start_time = datetime.strptime(initial_start_time_str, "%Y-%m-%dT%H:%MZ") + timedelta(minutes=15 * (int(position) - 1))
-            end_time = start_time + timedelta(minutes=15)
-            generation_schedule.append({
-                "Ora de Inceput": convert_utc_to_eet(start_time.strftime("%Y-%m-%dT%H:%M:%S")),
-                "Ora de Sfarsit": convert_utc_to_eet(end_time.strftime("%Y-%m-%dT%H:%M:%S")),
-                "Punct de bază [MW]": quantity,
-                "Bandă reglare [MW]": 0
-            })
-            
+        generation_schedule = parse_generation_schedule(response_schedule, date_from)
+        
         if generation_schedule:
             generation_schedule = sorted(generation_schedule, key=lambda x: x['Ora de Inceput'])
 
