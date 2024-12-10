@@ -54,6 +54,7 @@ def convert_utc_to_eet(utc_time_str):
 # Function to send SOAP request for Generation Schedule
 def get_generation_schedule(date_from, date_to):
     created, expires = get_current_timestamp()
+
     # SOAP request XML
     soap_request = f"""
     <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wse="http://markets.transelectrica.ro/wse">
@@ -162,7 +163,7 @@ def parse_generation_schedule(response_schedule, date_from):
             continue
 
         # Calculate time intervals
-        initial_start_time = datetime.combine(date_from, datetime.min.time()) - timedelta(hours=2)  # Adjust for EET
+        initial_start_time = datetime.combine(date_from, datetime.min.time())  # Adjust for EET
         start_time = initial_start_time + timedelta(minutes=15 * (position - 1))
         end_time = start_time + timedelta(minutes=15)
 
