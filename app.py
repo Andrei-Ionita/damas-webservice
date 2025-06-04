@@ -521,7 +521,7 @@ while True:
         date_from, date_to = handle_dates()
         st.session_state.previous_order_count = refresh_data(date_from, date_to, st.session_state.previous_order_count)
         # st.write(st.session_state)
-    for _ in range(60):
+    for _ in range(60*10):
         update_clock()
         time.sleep(1)
     st.rerun()
