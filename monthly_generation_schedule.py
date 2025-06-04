@@ -5,32 +5,6 @@ import xml.etree.ElementTree as ET
 import streamlit as st
 import pandas as pd
 
-# Setting the timezone to Europe/Bucharest (EET)
-eet_timezone = pytz.timezone('Europe/Bucharest')
-
-# Initializing the start date for the schedule
-start_date = datetime(2024, 7, 1, 0, 0, 0, tzinfo=eet_timezone)
-
-# Create the schedule for the month
-schedule = []
-
-# Loop through each day of the month
-for day in range(1, 32):  # Assuming 31 days max, adjust accordingly for specific months
-    for quarter in range(96):  # 96 quarters in a day (15-minute intervals)
-        start_time = start_date + timedelta(days=day-1, minutes=15 * quarter)
-        end_time = start_time + timedelta(minutes=15)
-        schedule.append({
-            "Ora de Inceput": start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "Ora de Sfarsit": end_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "Punct de bază [MW]": 4.3,
-            "Bandă reglare [MW]": 0
-        })
-
-# Display the schedule
-df_schedule = pd.DataFrame(schedule)
-st.write("Program de Generare pentru Iulie:")
-# st.table(df_schedule)
-
 # Function to get the current timestamp
 def get_current_timestamp():
     now = datetime.utcnow()
@@ -119,15 +93,51 @@ def fetch_july_orders(year=2024, month=7):
 
     return all_orders
 
-# Fetch and display the orders for July
-july_orders = fetch_july_orders()
-df_orders = pd.DataFrame(july_orders)
-st.write("Ordine de Dispecer pentru Iulie:")
-# st.table(df_orders)
+# Function to create initial generation schedule for the entire month
+def create_initial_schedule(year=2024, month=7):
+    eet_timezone = pytz.timezone('Europe/Bucharest')
+    schedule = []
+    base_time = datetime(year, month, 1, 0, 0, 0, tzinfo=eet_timezone)
+
+    for day in range(1, 32):
+        for i in range(96):  # 96 intervals per day
+            start_time = base_time + timedelta(days=day-1, minutes=15 * i)
+            end_time = start_time + timedelta(minutes=15)
+            hour = start_time.hour
+            
+            if day == 17:
+                if 0 <= hour < 7:
+                    power = 4.3
+                elif 7 <= hour < 10:
+                    power = 8.6
+                elif 10 <= hour < 16:
+                    power = 4.3
+                else:
+                    power = 8.6
+            elif day == 18:
+                if 0 <= hour < 10:
+                    power = 8.6
+                elif 10 <= hour < 16:
+                    power = 4.3
+                elif 16 <= hour < 19:
+                    power = 8.6
+                else:
+                    power = 4.3
+            else:
+                power = 4.3
+
+            schedule.append({
+                "Ora de Inceput": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "Ora de Sfarsit": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "Punct de bază [MW]": power,
+                "Bandă reglare [MW]": 0
+            })
+
+    return schedule
 
 # Function to apply dispatch orders to the initial schedule and create live schedule
 def apply_orders_to_schedule(initial_schedule, orders):
-    live_schedule = initial_schedule.copy()
+    live_schedule = [interval.copy() for interval in initial_schedule]
 
     for order in orders:
         order_start = datetime.strptime(order["Ora de Start"], "%Y-%m-%d %H:%M:%S")
@@ -150,14 +160,15 @@ def apply_orders_to_schedule(initial_schedule, orders):
 
 # Fetch orders for July
 july_orders = fetch_july_orders()
-
+# st.table(july_orders)
 # Create initial generation schedule for July
-initial_schedule = df_schedule.copy()
-
+initial_schedule = create_initial_schedule()
+# st.table(initial_schedule)
 # Apply orders to the initial schedule to create live schedule
 live_schedule = apply_orders_to_schedule(initial_schedule, july_orders)
 
-# Display live schedule
+# # Display live schedule
 df_live_schedule = pd.DataFrame(live_schedule)
 st.write("Program de Generare Live pentru Iulie:")
-st.table(df_live_schedule)
+st.dataframe(df_live_schedule)
+df_live_schedule.to_excel("./Generation_Schedule_July.xlsx")
